@@ -4,7 +4,8 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "convex dev --start 'vite dev'",
+    "dev": "convex dev --run seed:run --start 'vite dev'",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",
     "start": "node .output/server/index.mjs",
