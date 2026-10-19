@@ -1,10 +1,8 @@
 import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useConvexAuth } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { LoaderCircleIcon } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { SignInPrompt } from "~/components/sign-in-prompt";
 import { StatusBadge } from "~/components/status-badge";
@@ -20,7 +18,6 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "~/components/ui/dialog";
-import { Skeleton } from "~/components/ui/skeleton";
 import { errorMessage } from "~/lib/errors";
 import { formatDayLong, formatTime, TIME_ZONE_NOTE } from "~/lib/format";
 import { cn } from "~/lib/utils";
@@ -28,18 +25,24 @@ import { api } from "../../convex/_generated/api";
 
 export const Route = createFileRoute("/mis-clases")({
 	head: () => ({ meta: [{ title: "Mis clases · Aula IA" }] }),
+	loader: async ({ context }) => {
+		if (!context.isAuthenticated) return;
+		await context.queryClient.query({
+			...myBookingsQuery,
+			staleTime: "static",
+		});
+	},
 	component: MyClassesPage,
 });
+
+const myBookingsQuery = convexQuery(api.bookings.listMine, {});
 
 type Booking = FunctionReturnType<typeof api.bookings.listMine>[number];
 
 function MyClassesPage() {
-	const auth = useConvexAuth();
-	const bookings = useQuery(
-		convexQuery(api.bookings.listMine, auth.isAuthenticated ? {} : "skip"),
-	);
+	const { isAuthenticated } = Route.useRouteContext();
 
-	if (!auth.isLoading && !auth.isAuthenticated) {
+	if (!isAuthenticated) {
 		return (
 			<div className="mx-auto max-w-3xl sm:py-6">
 				<SignInPrompt
@@ -51,6 +54,12 @@ function MyClassesPage() {
 		);
 	}
 
+	return <MyClasses />;
+}
+
+function MyClasses() {
+	const { data: bookings } = useSuspenseQuery(myBookingsQuery);
+
 	return (
 		<div className="mx-auto max-w-3xl sm:py-6">
 			<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -61,21 +70,7 @@ function MyClassesPage() {
 			</p>
 
 			<div className="mt-8">
-				{bookings.isError ? (
-					<p role="alert" className="text-destructive">
-						{errorMessage(bookings.error)}
-					</p>
-				) : !bookings.data ? (
-					<div
-						className="grid gap-3"
-						role="status"
-						aria-busy="true"
-						aria-label="Cargando clases"
-					>
-						<Skeleton className="h-28 w-full rounded-xl" />
-						<Skeleton className="h-28 w-full rounded-xl" />
-					</div>
-				) : bookings.data.length === 0 ? (
+				{bookings.length === 0 ? (
 					<section className="rounded-xl border border-dashed px-6 py-12 text-center">
 						<h2 className="font-medium">Todavía no tenés clases reservadas</h2>
 						<p className="mt-1 text-muted-foreground">
@@ -87,7 +82,7 @@ function MyClassesPage() {
 					</section>
 				) : (
 					<ul className="grid gap-3">
-						{bookings.data.map((booking) => (
+						{bookings.map((booking) => (
 							<li key={booking._id}>
 								<BookingItem booking={booking} />
 							</li>
@@ -150,25 +145,49 @@ function BookingItem({ booking }: { booking: Booking }) {
 
 function CancelBookingButton({ booking }: { booking: Booking }) {
 	const [open, setOpen] = useState(false);
+	// Blocks a second click that lands before React re-renders (e.g. a double click).
+	const sending = useRef(false);
 	const cancel = useMutation({
-		mutationFn: useConvexMutation(api.bookings.cancel),
-		onSuccess: () => {
-			setOpen(false);
-			toast.success("Clase cancelada");
-		},
+		// Convex applies this to its local store at once and drops it when the server
+		// answers, so on error the card goes back to "Confirmada" by itself.
+		mutationFn: useConvexMutation(api.bookings.cancel).withOptimisticUpdate(
+			(store, { bookingId }) => {
+				const list = store.getQuery(api.bookings.listMine, {});
+				if (list) {
+					store.setQuery(
+						api.bookings.listMine,
+						{},
+						list.map((b) =>
+							b._id === bookingId ? { ...b, status: "cancelled" as const } : b,
+						),
+					);
+				}
+				const one = store.getQuery(api.bookings.get, { bookingId });
+				if (one) {
+					store.setQuery(
+						api.bookings.get,
+						{ bookingId },
+						{ ...one, status: "cancelled" },
+					);
+				}
+			},
+		),
+		// retry stays 0: Convex resends on reconnect and retries OCC; errors here are business errors.
+		onSuccess: () => toast.success("Clase cancelada"),
 		onError: (err) => toast.error(errorMessage(err)),
+		onSettled: () => {
+			sending.current = false;
+		},
 	});
 
 	return (
-		<Dialog
-			open={open}
-			onOpenChange={(next) => !cancel.isPending && setOpen(next)}
-		>
+		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
 				<Button
 					variant="outline"
 					size="sm"
 					className="self-start"
+					disabled={cancel.isPending}
 					aria-label={`Cancelar la clase del ${formatDayLong(booking.startsAt)} a las ${formatTime(booking.startsAt)}`}
 				>
 					Cancelar
@@ -186,23 +205,18 @@ function CancelBookingButton({ booking }: { booking: Booking }) {
 				</DialogHeader>
 				<DialogFooter>
 					<DialogClose asChild>
-						<Button variant="outline" disabled={cancel.isPending}>
-							Volver
-						</Button>
+						<Button variant="outline">Volver</Button>
 					</DialogClose>
 					<Button
 						variant="destructive"
-						disabled={cancel.isPending}
-						onClick={() => cancel.mutate({ bookingId: booking._id })}
+						onClick={() => {
+							setOpen(false);
+							if (sending.current) return;
+							sending.current = true;
+							cancel.mutate({ bookingId: booking._id });
+						}}
 					>
-						{cancel.isPending && (
-							<LoaderCircleIcon
-								data-icon="inline-start"
-								className="animate-spin"
-								aria-hidden
-							/>
-						)}
-						{cancel.isPending ? "Cancelando…" : "Cancelar clase"}
+						Cancelar clase
 					</Button>
 				</DialogFooter>
 			</DialogContent>

@@ -30,6 +30,11 @@ const getAuth = createServerFn({ method: "GET" }).handler(async () => {
 	return await getToken();
 });
 
+// In the browser the session only changes on sign-in/sign-out, and both do a
+// full page load, so ask the server once per page load, not on every navigation.
+// ponytail: a session that expires mid-visit still reads as signed in until reload.
+let clientAuth: ReturnType<typeof getAuth> | undefined;
+
 export const Route = createRootRouteWithContext<{
 	queryClient: QueryClient;
 	convexQueryClient: ConvexQueryClient;
@@ -65,7 +70,8 @@ export const Route = createRootRouteWithContext<{
 		],
 	}),
 	beforeLoad: async ({ context }) => {
-		const token = await getAuth();
+		if (typeof window !== "undefined") clientAuth ??= getAuth();
+		const token = await (clientAuth ?? getAuth());
 		// During SSR only (serverHttpClient exists only there), authenticate
 		// TanStack Query's Convex HTTP queries with the session's token.
 		if (token) context.convexQueryClient.serverHttpClient?.setAuth(token);

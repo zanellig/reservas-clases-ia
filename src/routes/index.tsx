@@ -11,7 +11,8 @@ import { api } from "../../convex/_generated/api";
 const teachersQuery = convexQuery(api.teachers.list, {});
 
 export const Route = createFileRoute("/")({
-	loader: ({ context }) => context.queryClient.ensureQueryData(teachersQuery),
+	loader: ({ context }) =>
+		context.queryClient.query({ ...teachersQuery, staleTime: "static" }),
 	head: () => ({
 		meta: [{ title: "Aula IA · Clases 1 a 1 de inteligencia artificial" }],
 	}),
