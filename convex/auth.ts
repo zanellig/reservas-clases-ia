@@ -21,7 +21,13 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
 		// Built-in per-IP limits (sign-in/sign-up: 3 per 10 s). "database" uses the
 		// component's rateLimit table; the default memory store isn't shared
 		// across Convex isolates.
-		rateLimit: { enabled: true, storage: "database" },
+		rateLimit: {
+			enabled: true,
+			storage: "database",
+			// Called server-to-server (SSR token fetch, Convex verifying JWTs), so
+			// they'd share one IP bucket across all users. Not a brute-force target.
+			customRules: { "/convex/token": false, "/convex/jwks": false },
+		},
 		// x-client-ip comes from our TanStack proxy (src/routes/api/auth/$.ts).
 		// ponytail: a direct caller of the .convex.site URL can spoof it; production
 		// fix is a shared secret between proxy and Convex, or a WAF rate limit.
