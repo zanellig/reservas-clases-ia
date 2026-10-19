@@ -5,7 +5,7 @@ import type { FunctionReturnType } from "convex/server";
 import { CalendarClockIcon } from "lucide-react";
 import { TeacherAvatar } from "~/components/teacher-avatar";
 import { Badge } from "~/components/ui/badge";
-import { formatDayShort, formatTime, TIME_ZONE_NOTE } from "~/lib/format";
+import { formatDayShort, formatTime } from "~/lib/format";
 import { api } from "../../convex/_generated/api";
 
 const teachersQuery = convexQuery(api.teachers.list, {});
@@ -41,7 +41,6 @@ function Home() {
 					<h2 id="profesores" className="text-lg font-semibold">
 						Profesores
 					</h2>
-					<p className="text-sm text-muted-foreground">{TIME_ZONE_NOTE}</p>
 				</div>
 
 				{teachers.length === 0 ? (
