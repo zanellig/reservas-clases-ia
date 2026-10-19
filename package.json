@@ -4,7 +4,7 @@
 	"sideEffects": false,
 	"type": "module",
 	"scripts": {
-		"dev": "convex dev --run seed:run --start 'vite dev'",
+		"dev": "convex dev --once --run seed:run && convex dev --start 'vite dev'",
 		"test": "vitest run",
 		"typecheck": "tsc --noEmit",
 		"build": "npm run typecheck && vite build",

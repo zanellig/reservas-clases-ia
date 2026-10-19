@@ -9,16 +9,37 @@ Prototipo de una plataforma donde los alumnos encuentran profesores de inteligen
 - [Bun](https://bun.sh) 1.3 o superior
 - Una cuenta de [Convex](https://convex.dev) es opcional. `convex dev` puede levantar un backend local sin cuenta.
 
-<!-- SETUP -->
+## Instalación
+
+```sh
+git clone https://github.com/zanellig/reservas-clases-ia.git
+cd reservas-clases-ia
+bun install
+```
+
+1. Creá el deployment de Convex con `bunx convex dev --once`. La CLI pregunta si querés iniciar sesión o arrancar sin cuenta, y las dos opciones funcionan. Sin cuenta, Convex corre localmente en el puerto 3210. El comando escribe `.env.local` con las URLs del deployment.
+
+   En este primer paso el push falla con `Required environment variables are not set: BETTER_AUTH_SECRET, SITE_URL`. Es lo esperado: el deployment ya existe, pero le faltan las variables de Better Auth.
+
+2. Cargá esas dos variables en el deployment:
+
+   ```sh
+   bunx convex env set BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
+   bunx convex env set SITE_URL http://localhost:3000
+   ```
+
+3. Corré `bun run dev` y abrí http://localhost:3000. Para reservar, creá una cuenta desde "Ingresar".
+
+`.env.example` lista las variables y explica de dónde sale cada una. No hace falta copiarlo, porque `convex dev` escribe `.env.local`.
 
 ## Comandos
 
-| Comando | Qué hace |
-| --- | --- |
-| `bun run dev` | Sube las funciones a Convex, corre el seed y levanta la app en http://localhost:3000 |
-| `bun run test` | Corre los tests del backend (vitest + convex-test) |
-| `bun run typecheck` | Chequeo de tipos con `tsc` |
-| `bun run build` | Build de producción |
+| Comando             | Qué hace                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `bun run dev`       | Sube las funciones a Convex, corre el seed y levanta la app en http://localhost:3000 |
+| `bun run test`      | Corre los tests del backend (vitest + convex-test)                                   |
+| `bun run typecheck` | Chequeo de tipos con `tsc`                                                           |
+| `bun run build`     | Build de producción                                                                  |
 
 ## Stack
 
@@ -57,7 +78,7 @@ Prototipo de una plataforma donde los alumnos encuentran profesores de inteligen
 5. El turno no tiene una reserva confirmada.
 6. El alumno no tiene otra clase en un horario que se superponga.
 
-Las mutations de Convex son transacciones serializables con control de concurrencia optimista. Si dos alumnos reservan el mismo turno al mismo tiempo, las dos leen el índice `by_slotId_and_status` y las dos intentan insertar. Convex confirma una y detecta que la otra leyó datos que cambiaron, así que la reintenta. En el reintento, esa segunda mutation ve la reserva ya hecha y falla con "Ese horario ya fue reservado". Esto no es una simulación: es la misma garantía que tendría la app en producción.
+Las mutations de Convex son transacciones serializables con control de concurrencia optimista. Si dos alumnos reservan el mismo turno al mismo tiempo, las dos leen el índice `by_slotId_and_status` y las dos intentan insertar. Convex confirma una y detecta que la otra leyó datos que cambiaron, así que la reintenta. En el reintento, esa segunda mutation ve la reserva ya hecha y falla con "Ese horario ya fue reservado". Es la misma garantía que tendría la app en producción.
 
 Con una base SQL, lo mismo se resuelve con un índice único parcial, que hace que la base rechace el segundo insert aunque dos requests lleguen juntas:
 
@@ -75,8 +96,10 @@ CREATE UNIQUE INDEX one_confirmed_booking_per_slot
 ## Cómo validé el resultado
 
 - Tests del backend en `convex/bookings.test.ts`, con el reloj fijo para que sean deterministas. Cubren: reserva exitosa, segundo alumno sobre el mismo turno, turno pasado, tema inválido, usuario sin sesión, superposición de horarios, cancelación que libera el turno, cancelación ajena o doble, `listMine` y `get` restringidos al dueño, y seed idempotente.
+- Una prueba de concurrencia real en `scripts/race-check.ts`. Registra dos alumnos y les hace reservar el mismo turno con dos `bookings.create` simultáneos contra el deployment. Lo corrí 7 veces y en todas se confirmó exactamente una reserva. Para repetirlo, con `bun run dev` corriendo: `bun scripts/race-check.ts`.
 - Revisión del código generado contra el contrato de la API que definí antes de implementar.
-- Prueba del flujo completo en el navegador con Playwright, incluida la reserva del mismo turno desde dos sesiones.
+- El flujo completo en Chromium con Playwright: registro, reserva, validación del tema, confirmación, "Mis clases" y cancelación, en escritorio y en mobile, sin errores de hidratación en consola.
+- Una instalación desde un clon limpio, siguiendo este README con un deployment local de Convex sin cuenta.
 
 ## Uso de IA
 
