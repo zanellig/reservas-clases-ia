@@ -8,7 +8,9 @@
  * @module
  */
 
-import type * as myFunctions from "../myFunctions.js";
+import type * as lib_constants from "../lib/constants.js";
+import type * as lib_student from "../lib/student.js";
+import type * as seedData from "../seedData.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +19,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  myFunctions: typeof myFunctions;
+  "lib/constants": typeof lib_constants;
+  "lib/student": typeof lib_student;
+  seedData: typeof seedData;
 }>;
 
 /**
