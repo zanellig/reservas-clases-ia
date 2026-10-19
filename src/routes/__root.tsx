@@ -70,9 +70,8 @@ export const Route = createRootRouteWithContext<{
 		],
 	}),
 	beforeLoad: async ({ context }) => {
-		const token = await (typeof window === "undefined"
-			? getAuth()
-			: (clientAuth ??= getAuth()));
+		if (typeof window !== "undefined") clientAuth ??= getAuth();
+		const token = await (clientAuth ?? getAuth());
 		// During SSR only (serverHttpClient exists only there), authenticate
 		// TanStack Query's Convex HTTP queries with the session's token.
 		if (token) context.convexQueryClient.serverHttpClient?.setAuth(token);
