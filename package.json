@@ -1,6 +1,7 @@
 {
 	"name": "reservas-clases-ia",
 	"private": true,
+	"license": "MIT",
 	"sideEffects": false,
 	"type": "module",
 	"scripts": {

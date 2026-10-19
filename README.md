@@ -128,12 +128,46 @@ CREATE UNIQUE INDEX one_confirmed_booking_per_slot
 
 ## Uso de IA
 
-Usé [Claude Code](https://claude.com/claude-code) (Claude Opus 5.5) como asistente de programación:
+Usé varios modelos y asigné cada tarea según su tipo.
+
+**[Claude Code](https://claude.com/claude-code) (Claude Opus 5.5) como orquestador.**
 
 - Primero lo usé para discutir el alcance y las decisiones de diseño: modelo de datos, estados de la reserva, validaciones y zona horaria.
-- Yo armé la plantilla, el schema y el contrato de la API. Después, tres agentes de Claude trabajaron en paralelo sobre archivos separados: backend y tests en Convex, integración de Better Auth, y páginas de la UI.
-- Las fotos de los profesores las generó ChatGPT (modelo de imágenes) a partir de un mismo estilo de referencia.
-- Revisé el código, corrí los tests y probé el flujo en el navegador antes de cada commit.
+- Con Claude armé la plantilla, el schema y el contrato de la API.
+- Después, agentes de Claude Opus trabajaron en paralelo, cada uno sobre sus propios archivos:
+  - Backend y tests en Convex
+  - Integración de Better Auth
+  - Páginas de la UI
+  - Precarga de las rutas privadas
+  - Cancelación optimista
+- Claude integró el trabajo de los agentes, investigó los problemas que aparecieron (el rate limit global de auth y el script `dev`) e hizo el deploy.
+- También hizo el prototipo de variantes de favicon del que elegí el birrete actual.
+
+**Sol 6.1 (OpenAI, vía Codex CLI, razonamiento alto).**
+
+- **Configuración del repo para agentes:** `AGENTS.md`, `docs/agents/`, GitHub Issues como tracker y etiquetas de triage (PR #1).
+- **Investigación de la carga de imágenes:**
+  - Encontró que el Avatar de Radix creaba la imagen recién después de hidratar.
+  - Lo midió con Playwright: con JavaScript demorado 2 segundos, el pedido de las fotos se corría los mismos 2 segundos.
+  - Propuso el patch que apliqué, con un `<img>` nativo en el SSR, fotos de 192 px y una hora de caché.
+- **Licencia MIT.**
+
+**Astra 6 (OpenAI, vía Codex CLI, razonamiento extra alto).**
+
+- Una revisión de seguridad adversarial del código.
+- Una segunda sesión verificó los hallazgos contra el código y las dependencias instaladas, sin crear exploits ni atacar el backend, y los publicó en el issue #2:
+  - Sesiones revocadas que siguen sirviendo hasta que vence el JWT.
+  - Un open redirect en `/login` con caracteres de control.
+  - Un `.take(100)` que puede ocultar reservas confirmadas.
+- Esos tres hallazgos encabezan los próximos pasos.
+
+**ChatGPT (modelo de imágenes).** Generó las fotos de los profesores a partir de un mismo estilo de referencia.
+
+**Cómo validé lo que generaron.**
+- Revisé el código contra el contrato.
+- Corrí los tests, el typecheck y Biome antes de cada commit.
+- Probé el flujo en el navegador.
+- Verifiqué cada propuesta aplicada con una prueba. Por ejemplo, el script de Sol pasó de FAIL a OK, y el rate limit lo comprobé con `curl` en local y en producción.
 
 ## Limitaciones conocidas
 
@@ -291,3 +325,7 @@ Antes del lanzamiento son indispensables: estas tres medidas, el issue #2, la ve
    - Para alumnos: ver las clases, entregar tareas y seguir su progreso, al estilo Udemy o Classroom pero más personal.
    - Clases 1:1 en vivo con WebRTC (LiveKit o un SFU propio) dentro de la misma plataforma.
    - Cada flujo se comprueba con un test de Playwright.
+
+## Licencia
+
+Este proyecto se distribuye bajo la [licencia MIT](LICENSE).
