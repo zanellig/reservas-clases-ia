@@ -135,14 +135,159 @@ Usé [Claude Code](https://claude.com/claude-code) (Claude Opus 5.5) como asiste
 - Las fotos de los profesores las generó ChatGPT (modelo de imágenes) a partir de un mismo estilo de referencia.
 - Revisé el código, corrí los tests y probé el flujo en el navegador antes de cada commit.
 
-## Limitaciones conocidas y próximos pasos
+## Limitaciones conocidas
 
 - Las queries usan `Date.now()`. Convex no las vuelve a ejecutar cuando pasa el tiempo, así que un turno que acaba de empezar sigue visible hasta que cambie algún dato. La solución es pasar la hora como argumento o redondearla en el cliente.
 - Quien llame directamente a la URL `.convex.site` puede mandar cualquier `x-client-ip` y esquivar el rate limit de auth por IP. En producción conviene un secreto compartido entre el proxy y Convex, o un rate limit en el WAF.
 - El rate limit de reservas corre dentro de la transacción. Si la reserva falla, por ejemplo porque el turno ya estaba tomado, el token se devuelve, así que solo cuentan las escrituras exitosas.
 - Si la sesión vence a mitad de una visita, la UI la sigue mostrando como activa hasta recargar. El servidor igual rechaza las operaciones.
 - No hay verificación de email ni recuperación de contraseña. Better Auth ya trae las dos cosas; falta configurar un proveedor de email (por ejemplo Resend).
-- Pagos: crear una sesión de Stripe Checkout al confirmar, guardar la reserva como `pending` y pasarla a `confirmed` desde el webhook. Un cron libera los turnos `pending` que no se pagan en 15 minutos.
-- Videollamada: al confirmar, una action de Convex crea la sala (Daily, Zoom o Google Meet) y guarda el link en la reserva.
-- Lado del profesor: rol `teacher`, carga de disponibilidad semanal que genera `slots`, y vista de su agenda.
-- Recordatorios por email con funciones programadas de Convex (`ctx.scheduler.runAt`).
+
+## Explicación, seguridad y próximos pasos
+
+### Qué hice
+
+Demo: lista de profesores, perfil, elegir horario, diálogo con el tema, confirmación, "Mis clases" y cancelación. Para mostrar que no hay reservas duplicadas, abrí el mismo turno en dos navegadores con cuentas distintas y confirmá en los dos: uno queda confirmado y el otro recibe "Ese horario ya fue reservado". `bun scripts/race-check.ts` hace lo mismo con dos requests simultáneos.
+
+- Funciona de verdad: registro e inicio de sesión, persistencia, reservas, cancelación, validaciones y rate limits.
+- Simulado: profesores, horarios y fotos (seed y fotos generadas con IA).
+- Pendiente: el lado del profesor, pagos, videollamada, verificación de email y los hallazgos del issue #2.
+
+### Tecnologías
+
+- **TanStack Start.** SSR con loaders que precargan datos al pasar el mouse por un link, y rutas de servidor para el proxy de auth.
+- **Convex.** Base de datos y backend en TypeScript. Las mutations son transacciones, lo que resuelve la concurrencia de reservas, y las queries reactivas actualizan los turnos sin polling. No hizo falta escribir una API aparte.
+- **Better Auth.** Email y contraseña, corriendo dentro de Convex, sin depender de un servicio externo.
+- **shadcn/ui y Tailwind.** Componentes accesibles sin diseñar desde cero.
+- **Herramientas.** Biome, vitest y `convex-test`. La demo corre en Vercel con runtime Bun.
+- **IA.** Claude Code (Claude Opus 5.5) y ChatGPT. Ver "Uso de IA" y "Cómo validé el resultado".
+
+### Decisiones técnicas y dificultades
+
+**Organización del código.**
+- `convex/`: schema, `teachers`, `bookings`, `seed` y helpers en `lib/`.
+- `src/routes`: una ruta por pantalla.
+- `src/components`: componentes compartidos.
+
+Definí el contrato de la API antes de repartir el trabajo, así backend, auth y UI pudieron avanzar en paralelo sin pisarse.
+
+Datos, reservas y validaciones están en "Decisiones técnicas", más arriba.
+
+Dificultades que encontré:
+1. **El rate limit de auth era global.** El edge de Convex reemplaza `x-forwarded-for` por la IP del servidor de TanStack. Lo detecté con una ruta temporal que devolvía los headers que recibe Convex, y lo resolví mandando la IP del navegador en `x-client-ip`.
+2. **Las fotos aparecían tarde.** El Avatar de Radix crea la imagen recién después de hidratar. Lo cambié por un `<img>` nativo que ya viene en el HTML del servidor, y bajé las fotos de 512 a 192 px (de 106 KB a 22 KB en total).
+3. **`convex dev --run` ignoraba `--start`.** Por eso Vite no arrancaba. Lo separé en dos pasos.
+
+### Cómo lo escalaría
+
+- **Permisos.** Una tabla de usuarios con rol (`student`, `teacher`, `admin`) y un helper `requireRole` en cada función.
+- **Datos.** Convex escala con índices. Los listados tienen que paginar con `.paginate()` en vez de cortar con `.take(100)`.
+- **Concurrencia.** Ya es transaccional. En una base SQL, la usaría junto con un índice único parcial por turno.
+- **Pruebas.** `convex-test` para cada regla de negocio y cada permiso, Playwright en CI para el flujo completo, y `race-check` contra cada preview.
+- **Rendimiento.** Queries por índice, precarga de rutas, CDN para los assets e imágenes del tamaño en que se muestran.
+- **Pagos.** Stripe Checkout:
+  1. La reserva se crea como `pending`.
+  2. Un webhook con firma verificada la pasa a `confirmed`, usando el id del evento como clave de idempotencia.
+  3. Un cron libera las reservas `pending` que no se pagan en 15 minutos.
+- **Videollamada.** Al confirmar, una action crea la sala (LiveKit o Daily). Solo el alumno y el profesor de esa reserva reciben un token de acceso, y el token vence.
+
+### Seguridad
+
+**Autenticación y sesiones.**
+- Implementado:
+  - Better Auth guarda las contraseñas con hash scrypt y la sesión en una cookie `httpOnly`.
+  - Convex recibe un JWT que vence a los 15 minutos.
+  - "Salir" borra la sesión.
+  - Login y registro tienen un límite de 3 intentos cada 10 segundos por IP.
+- Propuesto:
+  - Verificación de email y recuperación de contraseña.
+  - Validar que la sesión siga activa en cada función (issue #2, P1).
+  - 2FA para profesores y administradores.
+
+Con un proveedor como Firebase Authentication, la identidad la resuelve el proveedor. La app sigue a cargo de la autorización, de quién es dueño de cada reserva, de los límites de negocio y de los datos.
+
+**Roles y permisos.**
+- Implementado:
+  - El id del alumno sale del token (`ctx.auth.getUserIdentity()`), nunca de los argumentos.
+  - `bookings.get` y `bookings.cancel` comparan `booking.studentId` con ese id. Si no coinciden, `get` devuelve `null` y `cancel` responde "No encontramos esa reserva", sin revelar si la reserva existe.
+  - Cambiar el id en la URL o llamar directo a la API no alcanza para ver ni cancelar reservas ajenas, y hay tests que lo verifican.
+- Propuesto:
+  - El profesor ve y gestiona solo sus turnos.
+  - El administrador tiene acceso completo, con registro de auditoría.
+
+**Backend y base de datos.**
+- Implementado:
+  - Todas las funciones validan sus argumentos con `v`.
+  - Las reglas de negocio se validan dentro de la mutation.
+  - El seed es una `internalMutation` que no se puede llamar desde el cliente.
+- Cómo se prueba: Convex no tiene reglas de acceso como Firestore, así que la autorización vive en cada función, y se prueba con `convex-test` usando identidades distintas.
+
+**Integridad de las reservas.**
+- Implementado:
+  - Transacciones serializables, explicadas más arriba.
+  - Una solicitud repetida falla con un error claro ("ya fue reservado", "ya estaba cancelada").
+  - La UI bloquea el doble clic.
+  - El cliente de Convex reenvía las mutations sin confirmar y el servidor descarta los duplicados.
+- Propuesto: claves de idempotencia para los webhooks de pago.
+
+**Datos y secretos.**
+- Qué guardamos: nombre, email, hash de la contraseña y las reservas con su tema.
+- Implementado:
+  - `BETTER_AUTH_SECRET` vive en las variables de entorno de Convex, nunca en el repo.
+  - `.env.local` está en `.gitignore` y `.env.example` no tiene valores.
+  - Las variables `VITE_*` son públicas y solo contienen URLs.
+  - Todo el tráfico va por HTTPS (Vercel y Convex).
+- Propuesto: no registrar email ni tema en los logs, y definir una política de retención de datos.
+
+**Ataques y abuso.**
+- Implementado:
+  - **XSS:** React escapa todo y no usamos `dangerouslySetInnerHTML`; el tema se muestra como texto.
+  - **Inyección:** no hay SQL; las consultas usan índices tipados.
+  - **Requests de otro sitio:** Better Auth valida el `Origin`.
+  - **Automatización:** rate limit de auth por IP, token bucket por alumno en las reservas y un tope de 5 clases futuras.
+  - **Open redirect:** se valida el `redirect` del login.
+- Pendiente:
+  - Rechazar caracteres de control en ese `redirect` (issue #2).
+  - Un secreto compartido entre el proxy y Convex, para que nadie pueda falsificar `x-client-ip`.
+
+**Servicios externos.**
+- Verificar la firma de cada webhook (`Stripe-Signature`) y procesar cada evento una sola vez.
+- Links de videollamada con un token por usuario que vence.
+- Las claves de API solo en actions del servidor.
+
+### Seguridad en producción
+
+- Actualizar dependencias con Renovate y revisar vulnerabilidades en CI.
+- Tests de permisos en cada PR.
+- Registrar reservas, cancelaciones y logins fallidos sin datos personales.
+- Alertas por picos de errores o de respuestas 429.
+- Exportaciones programadas de Convex, con pruebas de restauración.
+- Si se expone una credencial:
+  1. Rotarla. Rotar `BETTER_AUTH_SECRET` invalida todas las sesiones.
+  2. Revocar las sesiones.
+  3. Revisar los logs del período expuesto.
+  4. Avisar a los usuarios afectados.
+
+**Tres riesgos priorizados:**
+
+| Riesgo | Medida | Prueba |
+| --- | --- | --- |
+| Un alumno ve o cancela una reserva ajena | Verificar el dueño en el servidor | Test con dos identidades (ya existe) y un request directo a la API con el token de otro usuario |
+| Dos alumnos reservan el mismo turno | Transacción serializable | `bun scripts/race-check.ts` (7 de 7 corridas OK) |
+| Fuerza bruta o bots | Rate limit por IP y por alumno | 4 logins seguidos devuelven 429 (verificado); test del token bucket (ya existe) |
+
+Antes del lanzamiento son indispensables: estas tres medidas, el issue #2, la verificación de email y el secreto entre el proxy y Convex. En una etapa posterior: 2FA, WAF y auditoría para administradores.
+
+### Próximos pasos, en orden
+
+1. **Issue #2, P1.** En `requireStudentId`, validar que la sesión siga activa. Se comprueba con un test que revoca la sesión y espera que la reserva se rechace.
+2. **Issue #2, P2.** En `/login`, rechazar caracteres de control y comparar el origen con `new URL()`. Se comprueba con tests de casos válidos y maliciosos.
+3. **Issue #2, P2.** Reemplazar `.take(100)` por un índice con estado y paginación. Se comprueba con un test que crea 101 reservas canceladas antes de una confirmada.
+4. **Verificación de email y recuperación de contraseña,** con Resend.
+5. **Lado del profesor:** disponibilidad semanal que genera los turnos, y una vista de su agenda.
+6. **Pagos con Stripe,** y después la videollamada.
+7. **Plataforma de contenidos.**
+   - Para profesores: subir y administrar clases grabadas y tareas, con visibilidad, publicación programada (`ctx.scheduler.runAt`), capítulos y subtítulos. Los subtítulos se pueden subir o generar automáticamente con WhisperX u otro modelo de voz a texto, en un worker.
+   - Para alumnos: ver las clases, entregar tareas y seguir su progreso, al estilo Udemy o Classroom pero más personal.
+   - Clases 1:1 en vivo con WebRTC (LiveKit o un SFU propio) dentro de la misma plataforma.
+   - Cada flujo se comprueba con un test de Playwright.
