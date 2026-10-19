@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Aula IA</title>
   <rect width="64" height="64" rx="14" fill="#171717"/>
-  <path d="M14 50 27.5 16 41 50M19.5 38h16" fill="none" stroke="#D6E2D8" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M48.5 9q1.6 7.4 9 9-7.4 1.6-9 9-1.6-7.4-9-9 7.4-1.6 9-9Z" fill="#A7C9AD"/>
+  <path d="M17 28v13c0 4.5 6.7 8 15 8s15-3.5 15-8V28l-15 6Z" fill="#A7C9AD"/>
+  <path d="M54 25v14" stroke="#A7C9AD" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M54 39q1 6 7 7-6 1-7 7-1-6-7-7 6-1 7-7Z" fill="#A7C9AD"/>
+  <path d="M32 13 58 25 32 37 6 25Z" fill="#D6E2D8"/>
 </svg>
