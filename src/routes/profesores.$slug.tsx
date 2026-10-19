@@ -21,9 +21,10 @@ const teacherQuery = (slug: string) =>
 
 export const Route = createFileRoute("/profesores/$slug")({
 	loader: async ({ context, params }) => {
-		const data = await context.queryClient.ensureQueryData(
-			teacherQuery(params.slug),
-		);
+		const data = await context.queryClient.query({
+			...teacherQuery(params.slug),
+			staleTime: "static",
+		});
 		if (!data) throw notFound();
 		return { name: data.teacher.name };
 	},

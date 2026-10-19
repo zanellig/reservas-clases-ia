@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import rateLimiter from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
@@ -23,6 +24,7 @@ afterEach(() => {
 
 async function setup() {
 	const t = convexTest(schema, modules);
+	rateLimiter.register(t);
 	const ids = await t.run(async (ctx) => {
 		const base = {
 			bio: "Bio",
@@ -219,6 +221,63 @@ describe("bookings queries", () => {
 			await t.withIdentity(beto).query(api.bookings.get, { bookingId: id }),
 		).toBeNull();
 		expect(await t.query(api.bookings.get, { bookingId: id })).toBeNull();
+	});
+});
+
+describe("booking limits", () => {
+	async function sixMoreSlots({
+		t,
+		teacherA,
+	}: Awaited<ReturnType<typeof setup>>) {
+		return await t.run((ctx) =>
+			Promise.all(
+				[3, 4, 5, 6, 7, 8].map((h) =>
+					ctx.db.insert("slots", {
+						teacherId: teacherA,
+						startsAt: NOW + h * HOUR,
+						durationMin: 60,
+					}),
+				),
+			),
+		);
+	}
+
+	test("rate-limits rapid writes per student", async () => {
+		const ctx = await setup();
+		const slots = await sixMoreSlots(ctx);
+		const asAna = ctx.t.withIdentity(ana);
+		for (const slotId of slots.slice(0, 5)) {
+			await asAna.mutation(api.bookings.create, { slotId, topic: TOPIC });
+		}
+		await expect(
+			asAna.mutation(api.bookings.create, { slotId: slots[5], topic: TOPIC }),
+		).rejects.toThrow("Hiciste muchos cambios seguidos");
+		// Each student has their own bucket.
+		await ctx.t
+			.withIdentity(beto)
+			.mutation(api.bookings.create, { slotId: slots[5], topic: TOPIC });
+	});
+
+	test("caps upcoming confirmed bookings per student", async () => {
+		const ctx = await setup();
+		const slots = await sixMoreSlots(ctx);
+		const asAna = ctx.t.withIdentity(ana);
+		const ids = [];
+		for (const slotId of slots.slice(0, 5)) {
+			ids.push(
+				await asAna.mutation(api.bookings.create, { slotId, topic: TOPIC }),
+			);
+		}
+		vi.setSystemTime(NOW + 60_000); // refill the rate-limit bucket
+		await expect(
+			asAna.mutation(api.bookings.create, { slotId: slots[5], topic: TOPIC }),
+		).rejects.toThrow("Ya tenés 5 clases reservadas");
+
+		await asAna.mutation(api.bookings.cancel, { bookingId: ids[0] });
+		await asAna.mutation(api.bookings.create, {
+			slotId: slots[5],
+			topic: TOPIC,
+		});
 	});
 });
 

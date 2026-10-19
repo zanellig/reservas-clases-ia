@@ -1,58 +1,69 @@
 import { convexQuery } from "@convex-dev/react-query";
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useConvexAuth } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import type { FunctionReturnType } from "convex/server";
 import { CircleCheckIcon } from "lucide-react";
 import { SignInPrompt } from "~/components/sign-in-prompt";
 import { StatusBadge } from "~/components/status-badge";
 import { TeacherAvatar } from "~/components/teacher-avatar";
 import { Button } from "~/components/ui/button";
-import { Skeleton } from "~/components/ui/skeleton";
 import { formatDayLong, formatTime } from "~/lib/format";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
+const bookingQuery = (bookingId: string) =>
+	convexQuery(api.bookings.get, { bookingId: bookingId as Id<"bookings"> });
+
 export const Route = createFileRoute("/reservas/$bookingId")({
 	head: () => ({ meta: [{ title: "Tu reserva · Aula IA" }] }),
+	loader: async ({ context, params }) => {
+		if (!context.isAuthenticated) return;
+		try {
+			await context.queryClient.query({
+				...bookingQuery(params.bookingId),
+				staleTime: "static",
+			});
+		} catch (err) {
+			// A malformed id fails the v.id("bookings") validator: same as missing.
+			if (String(err).includes("ArgumentValidationError")) throw notFound();
+			throw err;
+		}
+	},
 	component: BookingPage,
+	notFoundComponent: () => (
+		<div className="mx-auto max-w-xl sm:py-6">
+			<BookingNotFound />
+		</div>
+	),
 });
 
 function BookingPage() {
 	const { bookingId } = Route.useParams();
-	const auth = useConvexAuth();
-	const booking = useQuery(
-		convexQuery(
-			api.bookings.get,
-			auth.isAuthenticated
-				? { bookingId: bookingId as Id<"bookings"> }
-				: "skip",
-		),
-	);
+	const { isAuthenticated } = Route.useRouteContext();
 
 	return (
 		<div className="mx-auto max-w-xl sm:py-6">
-			{auth.isLoading || (auth.isAuthenticated && booking.isPending) ? (
-				<BookingSkeleton />
-			) : !auth.isAuthenticated ? (
+			{isAuthenticated ? (
+				<Booking bookingId={bookingId} />
+			) : (
 				<SignInPrompt
 					title="Iniciá sesión para ver tu reserva"
 					description="Las reservas solo las puede ver quien las hizo."
 					redirect={`/reservas/${bookingId}`}
 				/>
-			) : // A malformed id makes the query throw; treat it like a missing booking.
-			booking.isError || !booking.data ? (
-				<BookingNotFound />
-			) : (
-				<BookingDetails booking={booking.data} />
 			)}
 		</div>
 	);
 }
 
-type Booking = NonNullable<FunctionReturnType<typeof api.bookings.get>>;
+function Booking({ bookingId }: { bookingId: string }) {
+	const { data: booking } = useSuspenseQuery(bookingQuery(bookingId));
+	return booking ? <BookingDetails booking={booking} /> : <BookingNotFound />;
+}
 
-function BookingDetails({ booking }: { booking: Booking }) {
+type BookingView = NonNullable<FunctionReturnType<typeof api.bookings.get>>;
+
+function BookingDetails({ booking }: { booking: BookingView }) {
 	const confirmed = booking.status === "confirmed";
 	const day = formatDayLong(booking.startsAt);
 	const time = formatTime(booking.startsAt);
@@ -119,21 +130,6 @@ function BookingDetails({ booking }: { booking: Booking }) {
 				</Button>
 			</div>
 		</article>
-	);
-}
-
-function BookingSkeleton() {
-	return (
-		<div
-			className="grid gap-4"
-			role="status"
-			aria-busy="true"
-			aria-label="Cargando reserva"
-		>
-			<Skeleton className="h-8 w-2/3" />
-			<Skeleton className="h-5 w-full" />
-			<Skeleton className="mt-4 h-64 w-full rounded-xl" />
-		</div>
 	);
 }
 
