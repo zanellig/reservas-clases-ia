@@ -143,6 +143,26 @@ Usé varios modelos y asigné cada tarea según su tipo.
 - Claude integró el trabajo de los agentes, investigó los problemas que aparecieron (el rate limit global de auth y el script `dev`) e hizo el deploy.
 - También hizo el prototipo de variantes de favicon del que elegí el birrete actual.
 
+<details>
+<summary>Cómo elegí el favicon</summary>
+
+Claude armó una ruta descartable, `/prototype/favicon`, con cinco candidatos en SVG y la paleta del sitio: A (el ícono anterior, una "A" con una chispa), B (chispa), C (burbuja de chat), D (otra "A" con chispa, sobre fondo menta) y E (birrete). Con `?variant=` o las flechas ← → pasaba de una a otra, y la variante activa reemplazaba también el ícono real de la pestaña:
+
+```tsx
+for (const l of document.querySelectorAll('link[rel="icon"]')) l.href = v.src;
+```
+
+Cada variante se veía donde de verdad se juzga un favicon: en una barra de pestañas clara y oscura, en el encabezado, en la pantalla de inicio del celular y rasterizada a 16, 32 y 48 px reales, ampliada sin suavizado:
+
+```tsx
+ctx.drawImage(img, 0, 0, props.size, props.size); // canvas de size×size
+<canvas width={size} height={size} style={{ width: px, height: px, imageRendering: "pixelated" }} />
+```
+
+Elegí E porque a 16 px se sostiene mejor que la "A" con chispa anterior. Pasó a `public/favicon.svg` y la ruta del prototipo se borró.
+
+</details>
+
 **Sol 6.1 (OpenAI, vía Codex CLI, razonamiento alto).**
 
 - **Configuración del repo para agentes:** `AGENTS.md`, `docs/agents/`, GitHub Issues como tracker y etiquetas de triage (PR #1).
