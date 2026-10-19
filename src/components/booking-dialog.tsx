@@ -134,7 +134,7 @@ function BookingForm({ teacher, slot, available }: StepProps) {
 			</DialogHeader>
 
 			<dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 rounded-lg bg-muted/60 px-4 py-3">
-				<dt className="text-muted-foreground">Profesor</dt>
+				<dt className="text-muted-foreground">Docente</dt>
 				<dd className="font-medium">{teacher.name}</dd>
 				<dt className="text-muted-foreground">Día</dt>
 				<dd className="font-medium first-letter:uppercase">
