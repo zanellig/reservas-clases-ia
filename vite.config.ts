@@ -8,6 +8,10 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  // Better Auth guide: bundle the component during SSR to avoid module resolution issues.
+  ssr: {
+    noExternal: ['@convex-dev/better-auth'],
+  },
   plugins: [
     tailwindcss(),
     tsConfigPaths({
