@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { GraduationCap, LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { authClient } from "~/lib/auth-client";
 
 const navLink =
-	"text-sm text-muted-foreground transition-colors hover:text-foreground data-[status=active]:font-medium data-[status=active]:text-foreground";
+	"whitespace-nowrap text-sm text-muted-foreground transition-colors hover:text-foreground data-[status=active]:font-medium data-[status=active]:text-foreground";
 
 export function SiteHeader() {
 	const { data: session, isPending } = authClient.useSession();
@@ -17,9 +17,12 @@ export function SiteHeader() {
 
 	return (
 		<header className="border-b">
-			<div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
-				<Link to="/" className="flex items-center gap-2 font-semibold">
-					<GraduationCap className="size-5" />
+			<div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4 sm:gap-6">
+				<Link
+					to="/"
+					className="flex shrink-0 items-center gap-2 whitespace-nowrap font-semibold"
+				>
+					<img src="/favicon.svg" alt="" className="size-6" />
 					Aula IA
 				</Link>
 				<nav className="flex items-center gap-4">

@@ -10,43 +10,102 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AnotherPageRouteImport } from './routes/anotherPage'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as MisClasesRouteImport } from './routes/mis-clases'
+import { Route as ProfesoresSlugRouteImport } from './routes/profesores.$slug'
+import { Route as ReservasBookingIdRouteImport } from './routes/reservas.$bookingId'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AnotherPageRoute = AnotherPageRouteImport.update({
-  id: '/anotherPage',
-  path: '/anotherPage',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MisClasesRoute = MisClasesRouteImport.update({
+  id: '/mis-clases',
+  path: '/mis-clases',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfesoresSlugRoute = ProfesoresSlugRouteImport.update({
+  id: '/profesores/$slug',
+  path: '/profesores/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReservasBookingIdRoute = ReservasBookingIdRouteImport.update({
+  id: '/reservas/$bookingId',
+  path: '/reservas/$bookingId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/anotherPage': typeof AnotherPageRoute
+  '/login': typeof LoginRoute
+  '/mis-clases': typeof MisClasesRoute
+  '/profesores/$slug': typeof ProfesoresSlugRoute
+  '/reservas/$bookingId': typeof ReservasBookingIdRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/anotherPage': typeof AnotherPageRoute
+  '/login': typeof LoginRoute
+  '/mis-clases': typeof MisClasesRoute
+  '/profesores/$slug': typeof ProfesoresSlugRoute
+  '/reservas/$bookingId': typeof ReservasBookingIdRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/anotherPage': typeof AnotherPageRoute
+  '/login': typeof LoginRoute
+  '/mis-clases': typeof MisClasesRoute
+  '/profesores/$slug': typeof ProfesoresSlugRoute
+  '/reservas/$bookingId': typeof ReservasBookingIdRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/anotherPage'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/mis-clases'
+    | '/profesores/$slug'
+    | '/reservas/$bookingId'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/anotherPage'
-  id: '__root__' | '/' | '/anotherPage'
+  to:
+    | '/'
+    | '/login'
+    | '/mis-clases'
+    | '/profesores/$slug'
+    | '/reservas/$bookingId'
+    | '/api/auth/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/mis-clases'
+    | '/profesores/$slug'
+    | '/reservas/$bookingId'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AnotherPageRoute: typeof AnotherPageRoute
+  LoginRoute: typeof LoginRoute
+  MisClasesRoute: typeof MisClasesRoute
+  ProfesoresSlugRoute: typeof ProfesoresSlugRoute
+  ReservasBookingIdRoute: typeof ReservasBookingIdRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,11 +117,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/anotherPage': {
-      id: '/anotherPage'
-      path: '/anotherPage'
-      fullPath: '/anotherPage'
-      preLoaderRoute: typeof AnotherPageRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mis-clases': {
+      id: '/mis-clases'
+      path: '/mis-clases'
+      fullPath: '/mis-clases'
+      preLoaderRoute: typeof MisClasesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profesores/$slug': {
+      id: '/profesores/$slug'
+      path: '/profesores/$slug'
+      fullPath: '/profesores/$slug'
+      preLoaderRoute: typeof ProfesoresSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reservas/$bookingId': {
+      id: '/reservas/$bookingId'
+      path: '/reservas/$bookingId'
+      fullPath: '/reservas/$bookingId'
+      preLoaderRoute: typeof ReservasBookingIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -70,7 +157,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AnotherPageRoute: AnotherPageRoute,
+  LoginRoute: LoginRoute,
+  MisClasesRoute: MisClasesRoute,
+  ProfesoresSlugRoute: ProfesoresSlugRoute,
+  ReservasBookingIdRoute: ReservasBookingIdRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

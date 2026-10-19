@@ -17,7 +17,7 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import * as React from "react";
+import type * as React from "react";
 import { SiteHeader } from "~/components/site-header";
 import { Button } from "~/components/ui/button";
 import { Toaster } from "~/components/ui/sonner";
@@ -59,8 +59,9 @@ export const Route = createRootRouteWithContext<{
 				sizes: "16x16",
 				href: "/favicon-16x16.png",
 			},
-			{ rel: "manifest", href: "/site.webmanifest", color: "#fffff" },
-			{ rel: "icon", href: "/favicon.ico" },
+			{ rel: "manifest", href: "/site.webmanifest" },
+			{ rel: "icon", href: "/favicon.ico", sizes: "48x48" },
+			{ rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
 		],
 	}),
 	beforeLoad: async ({ context }) => {
