@@ -121,7 +121,7 @@ CREATE UNIQUE INDEX one_confirmed_booking_per_slot
 - Tests del backend en `convex/bookings.test.ts`, con el reloj fijo para que sean deterministas. Cubren: reserva exitosa, segundo alumno sobre el mismo turno, turno pasado, tema inválido, usuario sin sesión, superposición de horarios, cancelación que libera el turno, cancelación ajena o doble, `listMine` y `get` restringidos al dueño, rate limit por alumno, tope de 5 clases futuras y seed idempotente.
 - Una prueba de concurrencia real en `scripts/race-check.ts`. Registra dos alumnos y les hace reservar el mismo turno con dos `bookings.create` simultáneos contra el deployment. Lo corrí 7 veces y en todas se confirmó exactamente una reserva. Para repetirlo, con `bun run dev` corriendo: `bun scripts/race-check.ts`.
 - Revisión del código generado contra el contrato de la API que definí antes de implementar.
-- El flujo completo en Chromium con Playwright: registro, reserva, validación del tema, confirmación, "Mis clases" y cancelación, en escritorio y en mobile, sin errores de hidratación en consola.
+- El flujo completo en Chromium con Playwright: registro, reserva, validación del tema, confirmación, "Mis clases" y cancelación, en escritorio y en un teléfono de 390 px de ancho, sin errores de hidratación en consola. A 320 px y en tablets hay problemas de layout que encontré después de entregar ([#8](https://github.com/zanellig/reservas-clases-ia/issues/8)).
 - La cancelación optimista: con la mutation retenida, la tarjeta cambia a "Cancelada" en 23 ms; si el servidor la rechaza, vuelve a "Confirmada" y se muestra el error.
 - El rate limit de auth con `curl`: con 4 intentos de login seguidos desde la misma IP, el cuarto recibe 429, y una IP distinta no se ve afectada.
 - Una instalación desde un clon limpio, siguiendo este README con un deployment local de Convex sin cuenta.
@@ -174,8 +174,17 @@ Usé varios modelos y asigné cada tarea según su tipo.
 - Las queries usan `Date.now()`. Convex no las vuelve a ejecutar cuando pasa el tiempo, así que un turno que acaba de empezar sigue visible hasta que cambie algún dato. La solución es pasar la hora como argumento o redondearla en el cliente.
 - Quien llame directamente a la URL `.convex.site` puede mandar cualquier `x-client-ip` y esquivar el rate limit de auth por IP. En producción conviene un secreto compartido entre el proxy y Convex, o un rate limit en el WAF.
 - El rate limit de reservas corre dentro de la transacción. Si la reserva falla, por ejemplo porque el turno ya estaba tomado, el token se devuelve, así que solo cuentan las escrituras exitosas.
-- Si la sesión vence a mitad de una visita, la UI la sigue mostrando como activa hasta recargar. El servidor igual rechaza las operaciones.
+- Si la sesión termina con la pestaña abierta (vence, se revoca o se cierra en otro dispositivo), la UI no avisa y sigue mostrando al usuario como logueado hasta que navega ([#6](https://github.com/zanellig/reservas-clases-ia/issues/6)). El servidor tampoco la corta de inmediato: el JWT de Convex sigue valiendo hasta 15 minutos ([#2](https://github.com/zanellig/reservas-clases-ia/issues/2), P1).
 - No hay verificación de email ni recuperación de contraseña. Better Auth ya trae las dos cosas; falta configurar un proveedor de email (por ejemplo Resend).
+
+## Hallazgos posteriores a la entrega
+
+Después de entregar seguí usando la app y encontré estos problemas. Cada issue tiene la causa comprobada, capturas de antes y después, y un arreglo probado en local que todavía no está aplicado.
+
+- **[#5](https://github.com/zanellig/reservas-clases-ia/issues/5):** con una pestaña abierta desde antes de un deploy, la navegación deja de funcionar hasta recargar. Cada deploy cambia los nombres de los archivos JS de las rutas, y la pestaña pide los anteriores, que dan 404.
+- **[#6](https://github.com/zanellig/reservas-clases-ia/issues/6):** si la sesión termina con la pestaña abierta, la UI no avisa y sigue mostrando datos viejos.
+- **[#7](https://github.com/zanellig/reservas-clases-ia/issues/7):** en `/login`, el botón "Ingresar" del header no sale del modo "Crear cuenta".
+- **[#8](https://github.com/zanellig/reservas-clases-ia/issues/8):** a 320 px de ancho el header desborda, y en tablets los horarios del perfil quedan apretados.
 
 ## Explicación, seguridad y próximos pasos
 
@@ -185,7 +194,7 @@ Demo: lista de profesores, perfil, elegir horario, diálogo con el tema, confirm
 
 - Funciona de verdad: registro e inicio de sesión, persistencia, reservas, cancelación, validaciones y rate limits.
 - Simulado: profesores, horarios y fotos (seed y fotos generadas con IA).
-- Pendiente: el lado del profesor, pagos, videollamada, verificación de email y los hallazgos del issue #2.
+- Pendiente: el lado del profesor, pagos, videollamada, verificación de email, los hallazgos del issue [#2](https://github.com/zanellig/reservas-clases-ia/issues/2) y los bugs [#5](https://github.com/zanellig/reservas-clases-ia/issues/5) a [#8](https://github.com/zanellig/reservas-clases-ia/issues/8).
 
 ### Tecnologías
 
@@ -314,13 +323,15 @@ Antes del lanzamiento son indispensables: estas tres medidas, el issue #2, la ve
 
 ### Próximos pasos, en orden
 
-1. **Issue #2, P1.** En `requireStudentId`, validar que la sesión siga activa. Se comprueba con un test que revoca la sesión y espera que la reserva se rechace.
-2. **Issue #2, P2.** En `/login`, rechazar caracteres de control y comparar el origen con `new URL()`. Se comprueba con tests de casos válidos y maliciosos.
-3. **Issue #2, P2.** Reemplazar `.take(100)` por un índice con estado y paginación. Se comprueba con un test que crea 101 reservas canceladas antes de una confirmada.
-4. **Verificación de email y recuperación de contraseña,** con Resend.
-5. **Lado del profesor:** disponibilidad semanal que genera los turnos, y una vista de su agenda.
-6. **Pagos con Stripe,** y después la videollamada.
-7. **Plataforma de contenidos.**
+1. **Sesión terminada: issue [#2](https://github.com/zanellig/reservas-clases-ia/issues/2) (P1) y [#6](https://github.com/zanellig/reservas-clases-ia/issues/6).** En el servidor, `requireStudentId` valida que la sesión siga activa. En el cliente, un aviso y la actualización de las rutas apenas termina la sesión. Se comprueba con un test que revoca la sesión y espera que la reserva se rechace y que la UI muestre el aviso.
+2. **Navegación después de un deploy ([#5](https://github.com/zanellig/reservas-clases-ia/issues/5)).** Hoy afecta a cualquiera que tenga la app abierta durante un deploy. Se comprueba con un test que devuelve 404 para los archivos de ruta y verifica que la navegación termine en la página correcta.
+3. **Issue [#2](https://github.com/zanellig/reservas-clases-ia/issues/2), P2.** En `/login`, rechazar caracteres de control y comparar el origen con `new URL()`. Se comprueba con tests de casos válidos y maliciosos.
+4. **Issue [#2](https://github.com/zanellig/reservas-clases-ia/issues/2), P2.** Reemplazar `.take(100)` por un índice con estado y paginación. Se comprueba con un test que crea 101 reservas canceladas antes de una confirmada.
+5. **Responsive ([#8](https://github.com/zanellig/reservas-clases-ia/issues/8)) y modo de `/login` ([#7](https://github.com/zanellig/reservas-clases-ia/issues/7)).** Se comprueban con tests de Playwright: sin scroll horizontal de 320 a 1194 px, y el botón "Ingresar" del header vuelve al modo ingreso.
+6. **Verificación de email y recuperación de contraseña,** con Resend.
+7. **Lado del profesor:** disponibilidad semanal que genera los turnos, y una vista de su agenda.
+8. **Pagos con Stripe,** y después la videollamada.
+9. **Plataforma de contenidos.**
    - Para profesores: subir y administrar clases grabadas y tareas, con visibilidad, publicación programada (`ctx.scheduler.runAt`), capítulos y subtítulos. Los subtítulos se pueden subir o generar automáticamente con WhisperX u otro modelo de voz a texto, en un worker.
    - Para alumnos: ver las clases, entregar tareas y seguir su progreso, al estilo Udemy o Classroom pero más personal.
    - Clases 1:1 en vivo con WebRTC (LiveKit o un SFU propio) dentro de la misma plataforma.
