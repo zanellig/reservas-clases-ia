@@ -2,7 +2,7 @@
 
 Prototipo de una plataforma donde los alumnos encuentran profesores de inteligencia artificial, consultan sus especialidades y horarios, y reservan una clase 1:1.
 
-<!-- DEMO -->
+**Demo:** https://reservas-clases-ia.vercel.app (Vercel, runtime Bun, con Convex de producción). Para reservar, creá una cuenta desde "Ingresar"; no hace falta verificar el email.
 
 ## Requisitos
 
@@ -40,6 +40,19 @@ bun install
 | `bun run test`      | Corre los tests del backend (vitest + convex-test)                                   |
 | `bun run typecheck` | Chequeo de tipos con `tsc`                                                           |
 | `bun run build`     | Build de producción                                                                  |
+
+## Deploy
+
+La demo corre en Vercel. Nitro genera la salida para Vercel, y `bunVersion` en `vercel.json` hace que la función use el runtime de Bun. El backend es el deployment de producción de Convex. Para replicarlo:
+
+```sh
+bunx convex env set --prod BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
+bunx convex env set --prod SITE_URL https://<tu-dominio>.vercel.app
+bunx convex deploy
+bunx convex run --prod seed:run
+```
+
+En Vercel hay que cargar `VITE_CONVEX_URL` y `VITE_CONVEX_SITE_URL` con las URLs `.convex.cloud` y `.convex.site` del deployment de producción, y desplegar con `vercel deploy --prod`. Los cambios en `convex/` se publican con `bunx convex deploy`, porque Vercel solo construye el frontend.
 
 ## Stack
 
