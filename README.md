@@ -291,3 +291,7 @@ Antes del lanzamiento son indispensables: estas tres medidas, el issue #2, la ve
    - Para alumnos: ver las clases, entregar tareas y seguir su progreso, al estilo Udemy o Classroom pero más personal.
    - Clases 1:1 en vivo con WebRTC (LiveKit o un SFU propio) dentro de la misma plataforma.
    - Cada flujo se comprueba con un test de Playwright.
+
+## Licencia
+
+Este proyecto se distribuye bajo la [licencia MIT](LICENSE).
